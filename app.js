@@ -19,9 +19,10 @@ let filmsSearch = '';
 let selectedVenues = new Set();
 let calendarDayCount = 8;
 const ZOOM_LEVELS = [1, 3, 5, 7, 8, 10, 14, 17];
-let pinnedEvents = new Set();
+let eventPriorities = {};
 let activeCalendarTab = 'all';
 let filmPriorities = {};
+let pendingImportData = null;
 let suggestedEvents = new Set();
 let builderSeed = Date.now();
 let scheduleStart = '2026-06-21T00:00:00';
@@ -30,7 +31,14 @@ let shadeEvents = [];
 
 try {
   const saved = localStorage.getItem('pinned-events');
-  if (saved) pinnedEvents = new Set(JSON.parse(saved));
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) {
+      for (const slug of parsed) eventPriorities[slug] = 'pin';
+    } else if (parsed && typeof parsed === 'object') {
+      eventPriorities = parsed;
+    }
+  }
 } catch (e) { /* ignore */ }
 
 try {
@@ -38,9 +46,9 @@ try {
   if (saved) filmPriorities = JSON.parse(saved);
 } catch (e) { /* ignore */ }
 
-function savePinnedEvents() {
+function saveEventPriorities() {
   try {
-    localStorage.setItem('pinned-events', JSON.stringify([...pinnedEvents]));
+    localStorage.setItem('pinned-events', JSON.stringify(eventPriorities));
   } catch (e) { /* ignore */ }
 }
 
@@ -52,7 +60,7 @@ function saveFilmPriorities() {
 
 function exportSchedule() {
   const data = {
-    pinnedEvents: [...pinnedEvents],
+    pinnedEvents: eventPriorities,
     filmPriorities: filmPriorities
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -71,17 +79,86 @@ function importSchedule(file) {
   reader.onload = function () {
     try {
       const data = JSON.parse(reader.result);
-      if (data.pinnedEvents && Array.isArray(data.pinnedEvents) &&
-          data.filmPriorities && typeof data.filmPriorities === 'object') {
-        pinnedEvents = new Set(data.pinnedEvents);
+      if (!data.pinnedEvents || !data.filmPriorities || typeof data.filmPriorities !== 'object') return;
+
+      const convertedEvents = normalizeImportedEvents(data.pinnedEvents);
+      if (!convertedEvents) return;
+
+      if (isScheduleEmpty()) {
+        eventPriorities = convertedEvents;
         filmPriorities = data.filmPriorities;
-        savePinnedEvents();
+        saveEventPriorities();
         saveFilmPriorities();
         applyFilters();
+      } else {
+        pendingImportData = { eventPriorities: convertedEvents, filmPriorities: data.filmPriorities };
+        showImportModal();
       }
     } catch (e) { /* ignore */ }
   };
   reader.readAsText(file);
+}
+
+function normalizeImportedEvents(pinnedEvents) {
+  if (Array.isArray(pinnedEvents)) {
+    const obj = {};
+    for (const slug of pinnedEvents) obj[slug] = 'pin';
+    return obj;
+  }
+  if (typeof pinnedEvents === 'object') return pinnedEvents;
+  return null;
+}
+
+function isScheduleEmpty() {
+  return Object.keys(eventPriorities).length === 0 && Object.keys(filmPriorities).length === 0;
+}
+
+function mergePriorities(existing, incoming) {
+  const weights = { low: 1, med: 2, high: 3, pin: 4 };
+  const result = { ...existing };
+  for (const [key, value] of Object.entries(incoming)) {
+    const incomingWeight = weights[value] || 0;
+    const existingWeight = weights[result[key]] || 0;
+    if (incomingWeight > existingWeight) {
+      result[key] = value;
+    } else if (!(key in result)) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function showImportModal() {
+  document.getElementById('import-modal').classList.add('open');
+}
+
+function hideImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+  pendingImportData = null;
+}
+
+function handleImportMerge() {
+  if (!pendingImportData) return;
+  eventPriorities = mergePriorities(eventPriorities, pendingImportData.eventPriorities);
+  filmPriorities = mergePriorities(filmPriorities, pendingImportData.filmPriorities);
+  saveEventPriorities();
+  saveFilmPriorities();
+  applyFilters();
+  hideImportModal();
+}
+
+function handleImportOverwrite() {
+  if (!pendingImportData) return;
+  eventPriorities = pendingImportData.eventPriorities;
+  filmPriorities = pendingImportData.filmPriorities;
+  saveEventPriorities();
+  saveFilmPriorities();
+  applyFilters();
+  hideImportModal();
+}
+
+function handleImportCancel() {
+  hideImportModal();
 }
 
 // ── Init ──────────────────────────────────────────
@@ -254,7 +331,7 @@ function eventsConflict(slugA, slugB) {
 
 function isFilmSatisfied(title) {
   const evs = eventsByFilmTitle[title] || [];
-  return evs.some(e => pinnedEvents.has(e.event_slug) || suggestedEvents.has(e.event_slug));
+  return evs.some(e => eventPriorities[e.event_slug] === 'pin' || suggestedEvents.has(e.event_slug));
 }
 
 function isBuilderUnsatisfied(eventSlug) {
@@ -268,53 +345,98 @@ function isBuilderUnsatisfied(eventSlug) {
 
 function buildSchedule() {
   suggestedEvents = new Set();
+
   const unsatisfiedFilms = [];
   for (const film of uniqueFilms) {
     const key = filmKey(film.title);
     const priority = filmPriorities[key];
     if (!priority) continue;
     const evs = eventsByFilmTitle[film.title] || [];
-    const hasPinned = evs.some(e => pinnedEvents.has(e.event_slug));
+    const hasPinned = evs.some(e => eventPriorities[e.event_slug] === 'pin');
     if (hasPinned) continue;
-    unsatisfiedFilms.push({ key, title: film.title, priority });
+    unsatisfiedFilms.push({ type: 'film', key, title: film.title, priority });
+  }
+
+  for (const [slug, pri] of Object.entries(eventPriorities)) {
+    if (pri === 'pin') continue;
+    const ev = eventsBySlug[slug];
+    if (!ev || !ev.schedule_datetime) continue;
+    unsatisfiedFilms.push({ type: 'event', key: slug, title: ev.title, priority: pri, slug });
   }
 
   const PRIORITY_WEIGHT = { high: 3, med: 2, low: 1 };
-  unsatisfiedFilms.sort((a, b) => {
-    const w = PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
-    if (w !== 0) return w;
-    return a.title.localeCompare(b.title);
-  });
-
   const rng = mulberry32(builderSeed);
 
-  for (const film of unsatisfiedFilms) {
-    if (isFilmSatisfied(film.title)) continue;
-    const evs = eventsByFilmTitle[film.title] || [];
-    const candidates = evs.filter(e => {
-      const realEv = eventsBySlug[e.event_slug];
-      if (!realEv) return false;
-      if (currentFilters.venues.size > 0 && !currentFilters.venues.has(realEv.venue)) return false;
+  unsatisfiedFilms.sort((a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]);
+
+  const grouped = [];
+  let currentWeight = null;
+  for (const item of unsatisfiedFilms) {
+    const w = PRIORITY_WEIGHT[item.priority];
+    if (w !== currentWeight) {
+      currentWeight = w;
+      grouped.push([]);
+    }
+    grouped[grouped.length - 1].push(item);
+  }
+
+  for (const group of grouped) {
+    for (let i = group.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [group[i], group[j]] = [group[j], group[i]];
+    }
+  }
+
+  unsatisfiedFilms.length = 0;
+  for (const group of grouped) unsatisfiedFilms.push(...group);
+
+  const pinnedSlugs = Object.entries(eventPriorities)
+    .filter(([, pri]) => pri === 'pin')
+    .map(([slug]) => slug);
+  const conflictSlugs = new Set([...pinnedSlugs, ...suggestedEvents]);
+
+  for (const item of unsatisfiedFilms) {
+    if (item.type === 'event') {
+      if (suggestedEvents.has(item.slug)) continue;
+      const realEv = eventsBySlug[item.slug];
+      if (currentFilters.venues.size > 0 && !currentFilters.venues.has(realEv.venue)) continue;
       const range = getEventTimeRange(realEv);
-      if (scheduleStart) {
-        const startVal = new Date(stripOffset(scheduleStart));
-        if (range.start < startVal) return false;
+      if (scheduleStart && range.start < new Date(stripOffset(scheduleStart))) continue;
+      if (scheduleEnd && range.end > new Date(stripOffset(scheduleEnd))) continue;
+      let blocked = false;
+      for (const conflictSlug of conflictSlugs) {
+        if (eventsConflict(item.slug, conflictSlug)) { blocked = true; break; }
       }
-      if (scheduleEnd) {
-        const endVal = new Date(stripOffset(scheduleEnd));
-        if (range.end > endVal) return false;
+      if (!blocked) {
+        suggestedEvents.add(item.slug);
+        conflictSlugs.add(item.slug);
       }
-      for (const pinnedSlug of pinnedEvents) {
-        if (eventsConflict(realEv.slug, pinnedSlug)) return false;
+    } else {
+      if (isFilmSatisfied(item.title)) continue;
+      const evs = eventsByFilmTitle[item.title] || [];
+      const candidates = evs.filter(e => {
+        const realEv = eventsBySlug[e.event_slug];
+        if (!realEv) return false;
+        if (currentFilters.venues.size > 0 && !currentFilters.venues.has(realEv.venue)) return false;
+        const range = getEventTimeRange(realEv);
+        if (scheduleStart) {
+          const startVal = new Date(stripOffset(scheduleStart));
+          if (range.start < startVal) return false;
+        }
+        if (scheduleEnd) {
+          const endVal = new Date(stripOffset(scheduleEnd));
+          if (range.end > endVal) return false;
+        }
+        for (const conflictSlug of conflictSlugs) {
+          if (eventsConflict(realEv.slug, conflictSlug)) return false;
+        }
+        return true;
+      });
+      if (candidates.length > 0) {
+        const idx = Math.floor(rng() * candidates.length);
+        suggestedEvents.add(candidates[idx].event_slug);
+        conflictSlugs.add(candidates[idx].event_slug);
       }
-      for (const suggestedSlug of suggestedEvents) {
-        if (eventsConflict(realEv.slug, suggestedSlug)) return false;
-      }
-      return true;
-    });
-    if (candidates.length > 0) {
-      const idx = Math.floor(rng() * candidates.length);
-      suggestedEvents.add(candidates[idx].event_slug);
     }
   }
 }
@@ -387,8 +509,15 @@ function getEventTimeRange(ev) {
 }
 
 function isShadowed(eventSlug) {
-  if (pinnedEvents.size === 0) return false;
-  if (pinnedEvents.has(eventSlug)) return false;
+  if (eventPriorities[eventSlug] === 'pin') return false;
+  if (suggestedEvents.has(eventSlug)) return false;
+
+  const shadowCasters = [
+    ...Object.keys(eventPriorities).filter(s => eventPriorities[s] === 'pin'),
+    ...suggestedEvents
+  ];
+  if (shadowCasters.length === 0) return false;
+
   const ev = eventsBySlug[eventSlug];
   if (!ev) return false;
 
@@ -396,10 +525,10 @@ function isShadowed(eventSlug) {
   if (evDuration === 0) return false;
 
   const overlaps = [];
-  for (const pinnedSlug of pinnedEvents) {
-    const pinnedEv = eventsBySlug[pinnedSlug];
-    if (!pinnedEv) continue;
-    const { start: pStart, end: pEnd } = getEventTimeRange(pinnedEv);
+  for (const casterSlug of shadowCasters) {
+    const casterEv = eventsBySlug[casterSlug];
+    if (!casterEv) continue;
+    const { start: pStart, end: pEnd } = getEventTimeRange(casterEv);
 
     const overlapStart = new Date(Math.max(evStart.getTime(), pStart.getTime()));
     const overlapEnd = new Date(Math.min(evEnd.getTime(), pEnd.getTime()));
@@ -430,7 +559,7 @@ function getEventClassNames(slug) {
     classes.push('calendar-highlight');
   }
   if (activeCalendarTab !== 'builder' && isShadowed(slug)) classes.push('cal-event--shadowed');
-  if (activeCalendarTab === 'builder' && !pinnedEvents.has(slug) && !suggestedEvents.has(slug) && isBuilderUnsatisfied(slug)) {
+  if (activeCalendarTab === 'builder' && !suggestedEvents.has(slug) && eventPriorities[slug] !== 'pin') {
     classes.push('cal-event--unsatisfied');
   }
   if (eventsBySlug[slug]?.celluloid) classes.push('cal-event--celluloid');
@@ -443,7 +572,7 @@ function isUnsatisfiedPriority(eventSlug) {
     const key = filmKey(f.title);
     if (filmPriorities[key]) {
       const evs = eventsByFilmTitle[f.title] || [];
-      if (!evs.some(e => pinnedEvents.has(e.event_slug))) return true;
+      if (!evs.some(e => eventPriorities[e.event_slug] === 'pin')) return true;
     }
   }
   return false;
@@ -458,7 +587,9 @@ function buildCalEvent(ev) {
 
   const classNames = getEventClassNames(ev.slug);
   const hasFilms = fs.length > 0;
-  const isPinned = pinnedEvents.has(ev.slug);
+  const priority = eventPriorities[ev.slug];
+  const isPinned = priority === 'pin';
+  const isPrioritized = priority && !isPinned;
   const isSuggested = suggestedEvents.has(ev.slug);
   let bg, border, text;
 
@@ -467,6 +598,10 @@ function buildCalEvent(ev) {
     border = '#0FC3AE';
     text = '#000000';
     classNames.push('cal-event--suggested');
+  } else if (isPrioritized) {
+    bg = '#3A9A00';
+    border = '#3A9A00';
+    text = '#FFFFFF';
   } else if (isBuilderUnsatisfied(ev.slug)) {
     bg = '#64EB00';
     border = '#50C400';
@@ -603,9 +738,9 @@ function buildCalendarEvents() {
 
     let filtered = allEvents.filter(passesFilters);
     if (activeCalendarTab === 'personal') {
-      filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || isUnsatisfiedPriority(ev.slug));
+      filtered = filtered.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
     } else if (activeCalendarTab === 'builder') {
-      filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+      filtered = filtered.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
     }
 
     const calEvents = filtered.map(ev => buildCalEvent(ev));
@@ -693,9 +828,9 @@ function renderEventsList() {
   if (activeCalendarTab === 'all') {
     filtered = filtered.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || isUnsatisfiedPriority(ev.slug));
+    filtered = filtered.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
-    filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+    filtered = filtered.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
 
   // Group by day
@@ -715,11 +850,12 @@ function renderEventsList() {
       const fs = filmsByEventSlug[ev.slug] || [];
       const duration = getEventDuration(ev);
       const isExpanded = ev.slug === expandedEventSlug;
-      const pinned = pinnedEvents.has(ev.slug);
+      const priority = eventPriorities[ev.slug] || '';
+      const isPinned = priority === 'pin';
       const isSuggested = suggestedEvents.has(ev.slug);
       let shadowed;
       if (activeCalendarTab === 'builder') {
-        shadowed = !pinned && !isSuggested && isBuilderUnsatisfied(ev.slug);
+        shadowed = !isSuggested && priority !== 'pin';
       } else {
         shadowed = isShadowed(ev.slug);
       }
@@ -731,7 +867,7 @@ function renderEventsList() {
 
       html += `<div class="event-row${isExpanded ? ' expanded' : ''}${shadowed ? ' event-row--shadowed' : ''}" id="evt-${escHtml(ev.slug)}" data-slug="${escHtml(ev.slug)}">`;
       html += `<div class="event-row-header" data-action="toggle-event" data-slug="${escHtml(ev.slug)}">`;
-      html += `<button class="event-row-pin${pinned ? ' pinned' : ''}" data-action="toggle-pin" data-slug="${escHtml(ev.slug)}" aria-label="${pinned ? 'Remove from schedule' : 'Add to schedule'}"></button>`;
+      html += `<button class="event-row-pin${isPinned ? ' pinned' : priority ? ` priority-${priority}` : ''}" data-action="toggle-pin" data-slug="${escHtml(ev.slug)}" aria-label="${isPinned ? 'Remove from schedule' : priority ? 'Priority: ' + priority : 'Add to schedule'}">${PRIORITY_CHARS[priority] || ''}</button>`;
       html += `<span class="event-row-time">${escHtml(ev.schedule_time || '')}</span>`;
       html += `<span class="event-row-title">${escHtml(ev.title)}${ev.celluloid ? ' <svg class="celluloid-icon" width="12" height="12" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#E8A202" stroke-width="1.5"/><circle cx="7" cy="7" r="2" fill="#E8A202"/></svg>' : ''}</span>`;
       html += `<span class="event-row-venue">${escHtml(ev.venue || '')}</span>`;
@@ -807,13 +943,15 @@ function scrollToEvent(slug) {
   });
 }
 
-function togglePin(slug) {
-  if (pinnedEvents.has(slug)) {
-    pinnedEvents.delete(slug);
+function toggleEventPriority(slug) {
+  const current = eventPriorities[slug];
+  const next = current ? EVENT_PRIORITY_NEXT[current] : 'low';
+  if (next) {
+    eventPriorities[slug] = next;
   } else {
-    pinnedEvents.add(slug);
+    delete eventPriorities[slug];
   }
-  savePinnedEvents();
+  saveEventPriorities();
 
   const container = document.getElementById('events-list');
   const scrollTop = container.scrollTop;
@@ -839,6 +977,7 @@ function togglePin(slug) {
 }
 
 const PRIORITY_NEXT = { 'low': 'med', 'med': 'high', 'high': null };
+const EVENT_PRIORITY_NEXT = { 'low': 'med', 'med': 'high', 'high': 'pin', 'pin': null };
 const PRIORITY_CHARS = { low: '\u25BC', med: '\u25A0', high: '\u25B2' };
 
 function toggleFilmPriority(filmKey) {
@@ -874,9 +1013,9 @@ function renderFilmsList() {
   if (activeCalendarTab === 'all') {
     baseEvents = baseEvents.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    baseEvents = baseEvents.filter(ev => pinnedEvents.has(ev.slug) || isUnsatisfiedPriority(ev.slug));
+    baseEvents = baseEvents.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
-    baseEvents = baseEvents.filter(ev => pinnedEvents.has(ev.slug) || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+    baseEvents = baseEvents.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
   const filteredEvents = new Set(baseEvents.map(e => e.slug));
 
@@ -926,9 +1065,10 @@ function renderFilmsList() {
     html += `<div class="film-row-expand">`;
     for (const e of evs) {
       const inFilter = filteredEvents.has(e.event_slug);
-      const pinned = pinnedEvents.has(e.event_slug);
+      const priority = eventPriorities[e.event_slug] || '';
+      const isPinned = priority === 'pin';
       html += `<div class="film-screening" style="${inFilter ? '' : 'opacity:0.35;'}">`;
-      html += `<button class="event-row-pin film-screening-pin${pinned ? ' pinned' : ''}" data-action="toggle-pin" data-slug="${escHtml(e.event_slug)}" aria-label="${pinned ? 'Remove from schedule' : 'Add to schedule'}"></button>`;
+      html += `<button class="event-row-pin film-screening-pin${isPinned ? ' pinned' : priority ? ` priority-${priority}` : ''}" data-action="toggle-pin" data-slug="${escHtml(e.event_slug)}" aria-label="${isPinned ? 'Remove from schedule' : priority ? 'Priority: ' + priority : 'Add to schedule'}">${PRIORITY_CHARS[priority] || ''}</button>`;
       html += `<span class="film-screening-date">${escHtml(e.schedule_day || '')} ${escHtml(e.schedule_time || '')}</span>`;
       html += `<span class="film-screening-event" data-action="nav-event" data-slug="${escHtml(e.event_slug)}">${escHtml(e.event_title)}</span>`;
       html += `<span class="film-screening-venue">${escHtml(e.venue || '')}</span>`;
@@ -1133,7 +1273,7 @@ function setupTabListeners() {
     } else if (action.dataset.action === 'nav-film') {
       navigateToFilm(action.dataset.filmTitle);
     } else if (action.dataset.action === 'toggle-pin') {
-      togglePin(action.dataset.slug);
+      toggleEventPriority(action.dataset.slug);
     } else if (action.dataset.action === 'toggle-priority') {
       toggleFilmPriority(action.dataset.filmKey);
     }
@@ -1150,7 +1290,7 @@ function setupTabListeners() {
     } else if (action.dataset.action === 'nav-event') {
       navigateToEvent(action.dataset.slug);
     } else if (action.dataset.action === 'toggle-pin') {
-      togglePin(action.dataset.slug);
+      toggleEventPriority(action.dataset.slug);
     } else if (action.dataset.action === 'toggle-priority') {
       toggleFilmPriority(action.dataset.filmKey);
     }
@@ -1228,6 +1368,22 @@ function setupMenuListeners() {
     if (fileInput.files.length > 0) {
       importSchedule(fileInput.files[0]);
       fileInput.value = '';
+    }
+  });
+
+  const importModal = document.getElementById('import-modal');
+  importModal.addEventListener('click', (e) => {
+    const action = e.target.closest('[data-action]');
+    if (!action) {
+      if (e.target === importModal) handleImportCancel();
+      return;
+    }
+    if (action.dataset.action === 'import-merge') {
+      handleImportMerge();
+    } else if (action.dataset.action === 'import-overwrite') {
+      handleImportOverwrite();
+    } else if (action.dataset.action === 'import-cancel') {
+      handleImportCancel();
     }
   });
 }

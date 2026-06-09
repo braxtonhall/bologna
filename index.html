@@ -132,6 +132,24 @@
 
   </div>
 
+  <div id="import-modal" class="modal-overlay">
+    <div class="modal-box">
+      <h2 class="modal-title">Import Schedule</h2>
+      <p class="modal-body">You have an existing schedule. How would you like to proceed?</p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--merge" data-action="import-merge">
+          <strong>Merge</strong>
+          <small>Keep higher priorities from both</small>
+        </button>
+        <button class="modal-btn modal-btn--overwrite" data-action="import-overwrite">
+          <strong>Overwrite</strong>
+          <small>Replace your schedule entirely</small>
+        </button>
+        <button class="modal-btn modal-btn--cancel" data-action="import-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
   <script src="app.js"></script>
 </body>
