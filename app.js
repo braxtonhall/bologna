@@ -428,9 +428,6 @@ function getEventClassNames(slug) {
     classes.push('calendar-highlight');
   }
   if (activeCalendarTab !== 'builder' && isShadowed(slug)) classes.push('cal-event--shadowed');
-  if (activeCalendarTab === 'personal' && !pinnedEvents.has(slug)) {
-    classes.push('cal-event--unsatisfied');
-  }
   if (activeCalendarTab === 'builder' && !pinnedEvents.has(slug) && !suggestedEvents.has(slug) && isBuilderUnsatisfied(slug)) {
     classes.push('cal-event--unsatisfied');
   }
@@ -458,17 +455,37 @@ function buildCalEvent(ev) {
 
   const classNames = getEventClassNames(ev.slug);
   const hasFilms = fs.length > 0;
+  const isPinned = pinnedEvents.has(ev.slug);
+  const isSuggested = suggestedEvents.has(ev.slug);
   let bg, border, text;
 
-  if (activeCalendarTab === 'builder' && suggestedEvents.has(ev.slug) && !pinnedEvents.has(ev.slug)) {
+  if (isSuggested && !isPinned) {
+    bg = '#0FC3AE';
+    border = '#0FC3AE';
+    text = '#000000';
+    classNames.push('cal-event--suggested');
+  } else if (isBuilderUnsatisfied(ev.slug)) {
     bg = '#64EB00';
     border = '#50C400';
     text = '#000000';
-    classNames.push('cal-event--suggested');
+  } else if (isPinned) {
+    if (hasFilms) {
+      bg = '#E80247';
+      border = '#E80247';
+      text = '#ffffff';
+    } else {
+      bg = '#C2003A';
+      border = '#C2003A';
+      text = '#ffffff';
+    }
+  } else if (hasFilms) {
+    bg = '#EFEFEF';
+    border = '#EFEFEF';
+    text = '#000000';
   } else {
-    bg = hasFilms ? '#E80247' : '#0FE8CF';
-    border = hasFilms ? '#E80247' : '#0FC3AE';
-    text = hasFilms ? '#ffffff' : '#000000';
+    bg = '#707070';
+    border = '#707070';
+    text = '#ffffff';
   }
 
 
@@ -1074,6 +1091,7 @@ function setupTabListeners() {
       }
     } else {
       builderToolbar.style.display = 'none';
+      suggestedEvents = new Set();
     }
 
     expandedEventSlug = null;
