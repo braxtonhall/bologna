@@ -47,6 +47,31 @@ try {
   if (saved) filmPriorities = JSON.parse(saved);
 } catch (e) { /* ignore */ }
 
+let calendarInitialDate = '2026-06-21';
+
+try {
+  const saved = localStorage.getItem('calendar-day-count');
+  if (saved) {
+    const val = parseInt(saved, 10);
+    if (ZOOM_LEVELS.includes(val)) calendarDayCount = val;
+  }
+} catch (e) { /* ignore */ }
+
+try {
+  const saved = localStorage.getItem('calendar-date');
+  if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) calendarInitialDate = saved;
+} catch (e) { /* ignore */ }
+
+try {
+  const saved = localStorage.getItem('schedule-start');
+  if (saved) scheduleStart = saved;
+} catch (e) { /* ignore */ }
+
+try {
+  const saved = localStorage.getItem('schedule-end');
+  if (saved) scheduleEnd = saved;
+} catch (e) { /* ignore */ }
+
 function saveEventPriorities() {
   try {
     localStorage.setItem('pinned-events', JSON.stringify(eventPriorities));
@@ -56,6 +81,39 @@ function saveEventPriorities() {
 function saveFilmPriorities() {
   try {
     localStorage.setItem('film-priorities', JSON.stringify(filmPriorities));
+  } catch (e) { /* ignore */ }
+}
+
+function saveCalendarDayCount() {
+  try {
+    localStorage.setItem('calendar-day-count', calendarDayCount);
+  } catch (e) { /* ignore */ }
+}
+
+function saveCalendarDate() {
+  try {
+    if (calendar) {
+      const d = calendar.getDate();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      localStorage.setItem('calendar-date', `${y}-${m}-${day}`);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function saveScheduleBounds() {
+  try {
+    if (scheduleStart) {
+      localStorage.setItem('schedule-start', scheduleStart);
+    } else {
+      localStorage.removeItem('schedule-start');
+    }
+    if (scheduleEnd) {
+      localStorage.setItem('schedule-end', scheduleEnd);
+    } else {
+      localStorage.removeItem('schedule-end');
+    }
   } catch (e) { /* ignore */ }
 }
 
@@ -659,8 +717,8 @@ function initCalendar() {
   const initialEvents = allEvents.filter(passesFilters).map(ev => buildCalEvent(ev));
 
   calendar = new FullCalendar.Calendar(calEl, {
-    initialView: 'timeGrid8Day',
-    initialDate: '2026-06-21',
+    initialView: `timeGrid${calendarDayCount}Day`,
+    initialDate: calendarInitialDate,
     views: views,
     events: initialEvents,
     headerToolbar: false,
@@ -689,6 +747,7 @@ function initCalendar() {
     },
     datesSet: () => {
       updateScheduleWindowShade();
+      saveCalendarDate();
     }
   });
 
@@ -760,6 +819,7 @@ function zoomDayCount(delta) {
 
   calendarDayCount = ZOOM_LEVELS[newIdx];
   calendar.changeView(`timeGrid${calendarDayCount}Day`);
+  saveCalendarDayCount();
   document.getElementById('cal-zoom-label').textContent = `${calendarDayCount} day${calendarDayCount > 1 ? 's' : ''}`;
 
   if (activeCalendarTab === 'all') { renderEventsList(); renderFilmsList(); }
@@ -1327,22 +1387,26 @@ function setupTabListeners() {
   let builderStartTimeout;
   document.getElementById('builder-start-date').addEventListener('input', () => {
     scheduleStart = readScheduleStart();
+    saveScheduleBounds();
     clearTimeout(builderStartTimeout);
     builderStartTimeout = setTimeout(() => applyFilters(), 300);
   });
   document.getElementById('builder-start-time').addEventListener('input', () => {
     scheduleStart = readScheduleStart();
+    saveScheduleBounds();
     clearTimeout(builderStartTimeout);
     builderStartTimeout = setTimeout(() => applyFilters(), 300);
   });
   let builderEndTimeout;
   document.getElementById('builder-end-date').addEventListener('input', () => {
     scheduleEnd = readScheduleEnd();
+    saveScheduleBounds();
     clearTimeout(builderEndTimeout);
     builderEndTimeout = setTimeout(() => applyFilters(), 300);
   });
   document.getElementById('builder-end-time').addEventListener('input', () => {
     scheduleEnd = readScheduleEnd();
+    saveScheduleBounds();
     clearTimeout(builderEndTimeout);
     builderEndTimeout = setTimeout(() => applyFilters(), 300);
   });
