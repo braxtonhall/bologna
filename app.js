@@ -24,6 +24,7 @@ let activeCalendarTab = 'all';
 let filmPriorities = {};
 let pendingImportData = null;
 let suggestedEvents = new Set();
+let focusedEvents = new Set();
 let builderSeed = Date.now();
 let scheduleStart = '2026-06-21T00:00:00';
 let scheduleEnd = '2026-06-29T00:00:00';
@@ -738,9 +739,9 @@ function buildCalendarEvents() {
 
     let filtered = allEvents.filter(passesFilters);
     if (activeCalendarTab === 'personal') {
-      filtered = filtered.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+      filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
     } else if (activeCalendarTab === 'builder') {
-      filtered = filtered.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+      filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
     }
 
     const calEvents = filtered.map(ev => buildCalEvent(ev));
@@ -828,9 +829,9 @@ function renderEventsList() {
   if (activeCalendarTab === 'all') {
     filtered = filtered.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    filtered = filtered.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
-    filtered = filtered.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+    filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
 
   // Group by day
@@ -951,6 +952,7 @@ function toggleEventPriority(slug) {
   } else {
     delete eventPriorities[slug];
   }
+  focusedEvents.add(slug);
   saveEventPriorities();
 
   const container = document.getElementById('events-list');
@@ -980,15 +982,23 @@ const PRIORITY_NEXT = { 'low': 'med', 'med': 'high', 'high': null };
 const EVENT_PRIORITY_NEXT = { 'low': 'med', 'med': 'high', 'high': 'pin', 'pin': null };
 const PRIORITY_CHARS = { low: '\u25BC', med: '\u25A0', high: '\u25B2' };
 
-function toggleFilmPriority(filmKey) {
-  const current = filmPriorities[filmKey];
+function toggleFilmPriority(fKey) {
+  const current = filmPriorities[fKey];
   const next = current ? PRIORITY_NEXT[current] : 'low';
   if (next) {
-    filmPriorities[filmKey] = next;
+    filmPriorities[fKey] = next;
   } else {
-    delete filmPriorities[filmKey];
+    delete filmPriorities[fKey];
   }
   saveFilmPriorities();
+
+  for (const film of uniqueFilms) {
+    if (filmKey(film.title) === fKey) {
+      const evs = eventsByFilmTitle[film.title] || [];
+      for (const e of evs) focusedEvents.add(e.event_slug);
+      break;
+    }
+  }
 
   const eventsContainer = document.getElementById('events-list');
   const eventsScroll = eventsContainer.scrollTop;
@@ -1013,9 +1023,9 @@ function renderFilmsList() {
   if (activeCalendarTab === 'all') {
     baseEvents = baseEvents.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    baseEvents = baseEvents.filter(ev => eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
-    baseEvents = baseEvents.filter(ev => eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
+    baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
   const filteredEvents = new Set(baseEvents.map(e => e.slug));
 
@@ -1168,6 +1178,15 @@ function setupFilterListeners() {
   document.addEventListener('click', () => {
     dropdown.classList.remove('open');
     trigger.classList.remove('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!focusedEvents.size) return;
+    if (e.target.closest('[data-action="toggle-pin"], [data-action="toggle-priority"]')) return;
+    focusedEvents = new Set();
+    renderEventsList();
+    renderFilmsList();
+    buildCalendarEvents();
   });
 
   dropdown.addEventListener('click', (e) => e.stopPropagation());
