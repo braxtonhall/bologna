@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Il Cinema Ritrovato 2026 — Schedule</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+
+  <link rel="icon" href="favicon.jpg" sizes="32x32">
+  <link rel="icon" href="favicon.jpg" sizes="192x192">
+  <link rel="apple-touch-icon" href="favicon.jpg">
+</head>
+<body>
+
+  <div id="loading">
+    <div class="loading-spinner"></div>
+    <p>Loading festival data…</p>
+  </div>
+
+  <div id="app" style="display:none">
+
+    <header class="site-header">
+      <h1 class="site-title">IL CINEMA RITROVATO</h1>
+      <p class="site-subtitle">Bologna · 16 June – 2 July 2026 · 40th Edition</p>
+    </header>
+
+    <section id="calendar-section">
+      <nav class="tabs" id="calendar-tabs">
+        <button class="tab active" data-tab="all">All</button>
+        <button class="tab" data-tab="personal">My Schedule</button>
+        <button class="tab" data-tab="builder">Schedule Builder</button>
+      </nav>
+      <div class="calendar-toolbar">
+        <button id="cal-prev" class="cal-btn" title="Previous day">〈</button>
+        <div class="cal-zoom-group">
+          <button id="cal-zoom-in" class="cal-btn" title="More days">−</button>
+          <span id="cal-zoom-label" class="cal-zoom-label">8 days</span>
+          <button id="cal-zoom-out" class="cal-btn" title="Fewer days">+</button>
+        </div>
+        <button id="cal-next" class="cal-btn" title="Next day">〉</button>
+      </div>
+      <div id="builder-toolbar" class="builder-toolbar" style="display:none">
+        <label class="builder-field">
+          <span>Start</span>
+          <input type="datetime-local" id="builder-start" value="2026-06-21T00:00">
+        </label>
+        <label class="builder-field">
+          <span>End</span>
+          <input type="datetime-local" id="builder-end" value="2026-06-29T00:00">
+        </label>
+        <button id="builder-regenerate" class="cal-btn cal-btn--regenerate">Regenerate</button>
+      </div>
+      <div class="calendar-wrap">
+        <div id="calendar-loading" class="calendar-loading" aria-hidden="true">
+          <div class="calendar-loading-spinner"></div>
+        </div>
+        <div id="calendar"></div>
+      </div>
+    </section>
+
+    <aside id="sidebar">
+
+      <section id="filter-section">
+        <div class="filters">
+          <label class="filter-group filter-group--search">
+            <input type="text" id="filter-search" placeholder="Search events or films…">
+          </label>
+
+          <div class="filter-group" id="venue-filter-group">
+            <button id="venue-trigger" class="multi-trigger" type="button">
+              <span class="multi-trigger-label">All venues</span>
+              <span class="multi-trigger-arrow">▾</span>
+            </button>
+            <div id="venue-dropdown" class="multi-dropdown">
+              <div class="multi-dropdown-inner">
+                <label class="multi-item multi-item--all">
+                  <input type="checkbox" id="venue-all" checked>
+                  <span>Select All</span>
+                </label>
+                <div id="venue-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <label class="filter-group">
+            <span class="filter-label">Type</span>
+            <select id="filter-type">
+              <option value="">All Types</option>
+              <option value="Screening">Screening</option>
+              <option value="Appointment">Appointment</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section id="detail-section">
+        <nav class="tabs" id="detail-tabs">
+          <button class="tab active" data-tab="events">Events</button>
+          <button class="tab" data-tab="films">Films</button>
+        </nav>
+        <div id="events-panel" class="tab-panel active">
+          <div id="events-list"></div>
+        </div>
+        <div id="films-panel" class="tab-panel">
+          <div id="films-list"></div>
+        </div>
+      </section>
+
+    </aside>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
