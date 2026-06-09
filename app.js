@@ -541,9 +541,11 @@ function initCalendar() {
 
   document.getElementById('cal-prev').addEventListener('click', () => {
     calendar.incrementDate({ days: -1 });
+    if (activeCalendarTab === 'all') { renderEventsList(); renderFilmsList(); }
   });
   document.getElementById('cal-next').addEventListener('click', () => {
     calendar.incrementDate({ days: 1 });
+    if (activeCalendarTab === 'all') { renderEventsList(); renderFilmsList(); }
   });
   document.getElementById('cal-zoom-in').addEventListener('click', () => zoomDayCount(1));
   document.getElementById('cal-zoom-out').addEventListener('click', () => zoomDayCount(-1));
@@ -603,6 +605,19 @@ function zoomDayCount(delta) {
   calendarDayCount = ZOOM_LEVELS[newIdx];
   calendar.changeView(`timeGrid${calendarDayCount}Day`);
   document.getElementById('cal-zoom-label').textContent = `${calendarDayCount} day${calendarDayCount > 1 ? 's' : ''}`;
+
+  if (activeCalendarTab === 'all') { renderEventsList(); renderFilmsList(); }
+}
+
+function getCalendarEndDate() {
+  const end = new Date(calendar.getDate());
+  end.setDate(end.getDate() + calendarDayCount);
+  return end;
+}
+
+function isEventInCalendarView(ev) {
+  const dt = new Date(stripOffset(ev.schedule_datetime));
+  return dt >= calendar.getDate() && dt < getCalendarEndDate();
 }
 
 function isEventInCalendarRange(ev) {
@@ -655,7 +670,9 @@ function renderEventsList() {
   if (!container) return;
 
   let filtered = allEvents.filter(passesFilters);
-  if (activeCalendarTab === 'personal') {
+  if (activeCalendarTab === 'all') {
+    filtered = filtered.filter(isEventInCalendarView);
+  } else if (activeCalendarTab === 'personal') {
     filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
     filtered = filtered.filter(ev => pinnedEvents.has(ev.slug) || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
@@ -739,6 +756,8 @@ function renderEventsList() {
       // Introduced by / notes
       if (ev.introduced_by) html += `<div class="event-row-intro">${escHtml(ev.introduced_by)}</div>`;
       if (ev.notes) html += `<div class="event-row-notes">${escHtml(ev.notes)}</div>`;
+
+      if (ev.discover_more_url) html += `<a href="${escHtml(ev.discover_more_url)}" class="event-row-link" target="_blank" rel="noopener">View on ilcinemaritrovato.it →</a>`;
 
       html += `</div></div>`;
     }
@@ -832,7 +851,9 @@ function renderFilmsList() {
   if (!container) return;
 
   let baseEvents = allEvents.filter(passesFiltersForFilms);
-  if (activeCalendarTab === 'personal') {
+  if (activeCalendarTab === 'all') {
+    baseEvents = baseEvents.filter(isEventInCalendarView);
+  } else if (activeCalendarTab === 'personal') {
     baseEvents = baseEvents.filter(ev => pinnedEvents.has(ev.slug) || isUnsatisfiedPriority(ev.slug));
   } else if (activeCalendarTab === 'builder') {
     baseEvents = baseEvents.filter(ev => pinnedEvents.has(ev.slug) || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));

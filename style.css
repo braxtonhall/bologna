@@ -661,6 +661,19 @@ body {
   margin-top: 4px;
 }
 
+.event-row-link {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--cr-gray-mid);
+  text-decoration: none;
+  margin-top: 6px;
+  transition: color 0.15s;
+}
+.event-row-link:hover {
+  color: var(--cr-red);
+}
+
 /* ── Film list ──────────────────────────────────── */
 .films-alpha-header {
   font-family: var(--font-mono);
