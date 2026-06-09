@@ -362,6 +362,18 @@ body {
   outline: 1px solid var(--cr-red);
   outline-offset: -1px;
 }
+.filter-group--tab-search {
+  padding: 10px 0 10px;
+  display: block;
+  position: sticky;
+  top: 0;
+  background: var(--cr-white);
+  z-index: 3;
+}
+.filter-group--tab-search input {
+  width: 100%;
+  box-sizing: border-box;
+}
 
 /* ── Venue multi-select ─────────────────────────── */
 #venue-filter-group {
@@ -529,7 +541,7 @@ body {
   padding: 16px 0 8px;
   border-bottom: 1px solid var(--cr-gray-light);
   position: sticky;
-  top: 0;
+  top: 42px;
   background: var(--cr-white);
   z-index: 2;
 }
@@ -615,6 +627,12 @@ body {
 .badge--screenings { border-color: var(--cr-black); color: var(--cr-black); }
 .badge--more { border-color: var(--cr-teal); color: var(--cr-teal); cursor: default; }
 
+.celluloid-icon {
+  vertical-align: middle;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
 .event-row-expand {
   padding: 0 8px 16px 70px;
   display: none;
@@ -684,7 +702,7 @@ body {
   padding: 16px 8px 6px;
   border-bottom: 1px solid var(--cr-gray-light);
   position: sticky;
-  top: 0;
+  top: 42px;
   background: var(--cr-white);
   z-index: 2;
 }
@@ -789,6 +807,21 @@ body {
 }
 .fc-event.cal-event--unsatisfied {
   opacity: 0.35;
+}
+.fc-event.cal-event--celluloid {
+  position: relative;
+  overflow: hidden;
+}
+.fc-event.cal-event--celluloid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 6px 0 0;
+  border-color: #E8A202 transparent transparent transparent;
 }
 .fc-event.cal-event--suggested {
   opacity: 1 !important;

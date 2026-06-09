@@ -13,7 +13,9 @@ let expandedEventSlug = null;
 let expandedFilmKey = null;
 let calendarHighlightSlug = null;
 let filmHighlightSlugs = new Set();
-let currentFilters = { venues: new Set(), type: '', search: '' };
+let currentFilters = { venues: new Set(), type: '' };
+let eventsSearch = '';
+let filmsSearch = '';
 let selectedVenues = new Set();
 let calendarDayCount = 8;
 const ZOOM_LEVELS = [1, 3, 5, 7, 8, 10, 14, 17];
@@ -364,8 +366,8 @@ function updateScheduleWindowShade() {
 function passesFilters(event) {
   if (currentFilters.venues.size > 0 && !currentFilters.venues.has(event.venue)) return false;
   if (currentFilters.type && event.type !== currentFilters.type) return false;
-  if (currentFilters.search) {
-    const q = currentFilters.search.toLowerCase();
+  if (eventsSearch) {
+    const q = eventsSearch.toLowerCase();
     if (!event.title.toLowerCase().includes(q)) return false;
   }
   return event.schedule_datetime !== null;
@@ -431,6 +433,7 @@ function getEventClassNames(slug) {
   if (activeCalendarTab === 'builder' && !pinnedEvents.has(slug) && !suggestedEvents.has(slug) && isBuilderUnsatisfied(slug)) {
     classes.push('cal-event--unsatisfied');
   }
+  if (eventsBySlug[slug]?.celluloid) classes.push('cal-event--celluloid');
   return classes;
 }
 
@@ -730,7 +733,7 @@ function renderEventsList() {
       html += `<div class="event-row-header" data-action="toggle-event" data-slug="${escHtml(ev.slug)}">`;
       html += `<button class="event-row-pin${pinned ? ' pinned' : ''}" data-action="toggle-pin" data-slug="${escHtml(ev.slug)}" aria-label="${pinned ? 'Remove from schedule' : 'Add to schedule'}"></button>`;
       html += `<span class="event-row-time">${escHtml(ev.schedule_time || '')}</span>`;
-      html += `<span class="event-row-title">${escHtml(ev.title)}</span>`;
+      html += `<span class="event-row-title">${escHtml(ev.title)}${ev.celluloid ? ' <svg class="celluloid-icon" width="12" height="12" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="none" stroke="#E8A202" stroke-width="1.5"/><circle cx="7" cy="7" r="2" fill="#E8A202"/></svg>' : ''}</span>`;
       html += `<span class="event-row-venue">${escHtml(ev.venue || '')}</span>`;
       html += `<span class="event-row-badges">${badges}</span>`;
       html += `</div>`;
@@ -877,7 +880,7 @@ function renderFilmsList() {
   }
   const filteredEvents = new Set(baseEvents.map(e => e.slug));
 
-  const searchQ = currentFilters.search.toLowerCase();
+  const searchQ = filmsSearch.toLowerCase();
 
   const shown = uniqueFilms.filter(f => {
     const evs = eventsByFilmTitle[f.title] || [];
@@ -1049,10 +1052,18 @@ function setupFilterListeners() {
     applyFilters();
   });
 
-  document.getElementById('filter-search').addEventListener('input', (e) => {
+  document.getElementById('filter-search-events').addEventListener('input', (e) => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-      currentFilters.search = e.target.value;
+      eventsSearch = e.target.value;
+      applyFilters();
+    }, 200);
+  });
+
+  document.getElementById('filter-search-films').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      filmsSearch = e.target.value;
       applyFilters();
     }, 200);
   });

@@ -81,9 +81,6 @@
 
       <section id="filter-section">
         <div class="filters">
-          <label class="filter-group filter-group--search">
-            <input type="text" id="filter-search" placeholder="Search events or films…">
-          </label>
 
           <div class="filter-group" id="venue-filter-group">
             <button id="venue-trigger" class="multi-trigger" type="button">
@@ -118,9 +115,15 @@
           <button class="tab" data-tab="films">Films</button>
         </nav>
         <div id="events-panel" class="tab-panel active">
+          <label class="filter-group filter-group--search filter-group--tab-search">
+            <input type="text" id="filter-search-events" placeholder="Search events…">
+          </label>
           <div id="events-list"></div>
         </div>
         <div id="films-panel" class="tab-panel">
+          <label class="filter-group filter-group--search filter-group--tab-search">
+            <input type="text" id="filter-search-films" placeholder="Search films…">
+          </label>
           <div id="films-list"></div>
         </div>
       </section>
