@@ -428,6 +428,12 @@ function getEventClassNames(slug) {
     classes.push('calendar-highlight');
   }
   if (activeCalendarTab !== 'builder' && isShadowed(slug)) classes.push('cal-event--shadowed');
+  if (activeCalendarTab === 'personal' && !pinnedEvents.has(slug)) {
+    classes.push('cal-event--unsatisfied');
+  }
+  if (activeCalendarTab === 'builder' && !pinnedEvents.has(slug) && !suggestedEvents.has(slug) && isBuilderUnsatisfied(slug)) {
+    classes.push('cal-event--unsatisfied');
+  }
   return classes;
 }
 
@@ -465,12 +471,6 @@ function buildCalEvent(ev) {
     text = hasFilms ? '#ffffff' : '#000000';
   }
 
-  if (activeCalendarTab === 'personal' && !pinnedEvents.has(ev.slug)) {
-    classNames.push('cal-event--unsatisfied');
-  }
-  if (activeCalendarTab === 'builder' && !pinnedEvents.has(ev.slug) && !suggestedEvents.has(ev.slug) && isBuilderUnsatisfied(ev.slug)) {
-    classNames.push('cal-event--unsatisfied');
-  }
 
   return {
     id: ev.slug,
