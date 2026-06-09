@@ -923,6 +923,7 @@ body {
 .fc-event.cal-event--celluloid {
   position: relative;
   overflow: hidden;
+  height: 100%;
 }
 .fc-event.cal-event--celluloid::before {
   content: '';
