@@ -48,6 +48,40 @@ function saveFilmPriorities() {
   } catch (e) { /* ignore */ }
 }
 
+function exportSchedule() {
+  const data = {
+    pinnedEvents: [...pinnedEvents],
+    filmPriorities: filmPriorities
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bologna.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importSchedule(file) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.pinnedEvents && Array.isArray(data.pinnedEvents) &&
+          data.filmPriorities && typeof data.filmPriorities === 'object') {
+        pinnedEvents = new Set(data.pinnedEvents);
+        filmPriorities = data.filmPriorities;
+        savePinnedEvents();
+        saveFilmPriorities();
+        applyFilters();
+      }
+    } catch (e) { /* ignore */ }
+  };
+  reader.readAsText(file);
+}
+
 // ── Init ──────────────────────────────────────────
 async function init() {
   const SQL = await initSqlJs({
@@ -64,6 +98,7 @@ async function init() {
   renderFilmsList();
   setupFilterListeners();
   setupTabListeners();
+  setupMenuListeners();
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = '';
@@ -286,6 +321,18 @@ function regenerateSchedule() {
   builderSeed = Math.floor(Math.random() * 2147483647);
   buildSchedule();
   applyFilters();
+}
+
+function readScheduleStart() {
+  const d = document.getElementById('builder-start-date').value;
+  const t = document.getElementById('builder-start-time').value;
+  return d && t ? `${d}T${t}:00` : null;
+}
+
+function readScheduleEnd() {
+  const d = document.getElementById('builder-end-date').value;
+  const t = document.getElementById('builder-end-time').value;
+  return d && t ? `${d}T${t}:00` : null;
 }
 
 function updateScheduleWindowShade() {
@@ -996,8 +1043,14 @@ function setupTabListeners() {
     const builderToolbar = document.getElementById('builder-toolbar');
     if (name === 'builder') {
       builderToolbar.style.display = '';
-      if (scheduleStart) document.getElementById('builder-start').value = scheduleStart.substring(0, 16);
-      if (scheduleEnd) document.getElementById('builder-end').value = scheduleEnd.substring(0, 16);
+      if (scheduleStart) {
+        document.getElementById('builder-start-date').value = scheduleStart.substring(0, 10);
+        document.getElementById('builder-start-time').value = scheduleStart.substring(11, 16);
+      }
+      if (scheduleEnd) {
+        document.getElementById('builder-end-date').value = scheduleEnd.substring(0, 10);
+        document.getElementById('builder-end-time').value = scheduleEnd.substring(11, 16);
+      }
     } else {
       builderToolbar.style.display = 'none';
     }
@@ -1063,19 +1116,69 @@ function setupTabListeners() {
 
   // Builder toolbar
   let builderStartTimeout;
-  document.getElementById('builder-start').addEventListener('input', (e) => {
-    scheduleStart = e.target.value ? e.target.value + ':00' : null;
+  document.getElementById('builder-start-date').addEventListener('input', () => {
+    scheduleStart = readScheduleStart();
+    clearTimeout(builderStartTimeout);
+    builderStartTimeout = setTimeout(() => applyFilters(), 300);
+  });
+  document.getElementById('builder-start-time').addEventListener('input', () => {
+    scheduleStart = readScheduleStart();
     clearTimeout(builderStartTimeout);
     builderStartTimeout = setTimeout(() => applyFilters(), 300);
   });
   let builderEndTimeout;
-  document.getElementById('builder-end').addEventListener('input', (e) => {
-    scheduleEnd = e.target.value ? e.target.value + ':00' : null;
+  document.getElementById('builder-end-date').addEventListener('input', () => {
+    scheduleEnd = readScheduleEnd();
+    clearTimeout(builderEndTimeout);
+    builderEndTimeout = setTimeout(() => applyFilters(), 300);
+  });
+  document.getElementById('builder-end-time').addEventListener('input', () => {
+    scheduleEnd = readScheduleEnd();
     clearTimeout(builderEndTimeout);
     builderEndTimeout = setTimeout(() => applyFilters(), 300);
   });
   document.getElementById('builder-regenerate').addEventListener('click', () => {
     regenerateSchedule();
+  });
+}
+
+function setupMenuListeners() {
+  const trigger = document.getElementById('menu-trigger');
+  const dropdown = document.getElementById('menu-dropdown');
+  const fileInput = document.getElementById('import-file');
+
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = dropdown.classList.toggle('open');
+    trigger.classList.toggle('open', open);
+  });
+
+  document.addEventListener('click', () => {
+    dropdown.classList.remove('open');
+    trigger.classList.remove('open');
+  });
+
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const action = e.target.closest('[data-action]');
+    if (!action) return;
+
+    if (action.dataset.action === 'export-schedule') {
+      exportSchedule();
+      dropdown.classList.remove('open');
+      trigger.classList.remove('open');
+    } else if (action.dataset.action === 'import-schedule') {
+      fileInput.click();
+      dropdown.classList.remove('open');
+      trigger.classList.remove('open');
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      importSchedule(fileInput.files[0]);
+      fileInput.value = '';
+    }
   });
 }
 

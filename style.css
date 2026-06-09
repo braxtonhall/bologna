@@ -90,6 +90,65 @@ body {
   letter-spacing: 0.06em;
 }
 
+/* ── Header menu ────────────────────────────────── */
+.header-menu {
+  position: relative;
+  margin-left: auto;
+}
+.menu-trigger {
+  font-family: var(--font-sans);
+  font-size: 1.2rem;
+  color: var(--cr-white);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.menu-trigger:hover,
+.menu-trigger.open {
+  color: var(--cr-red);
+}
+.menu-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  z-index: 30;
+  background: var(--cr-white);
+  border: 1px solid var(--cr-gray-light);
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.menu-dropdown.open {
+  display: block;
+}
+.menu-dropdown-inner {
+  padding: 4px 0;
+}
+.menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--cr-black);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.menu-item:hover {
+  background: var(--cr-gray-off);
+  color: var(--cr-red);
+}
+
 /* ── Tabs (shared) ──────────────────────────────── */
 .tabs {
   display: flex; gap: 0;
@@ -187,6 +246,13 @@ body {
   background: var(--cr-gray-off);
   color: var(--cr-black);
   border-radius: 0;
+}
+.builder-field input[type="date"] {
+  width: 120px;
+}
+.builder-field input[type="time"],
+.builder-field .time-input {
+  width: 72px;
 }
 .builder-field input:focus {
   outline: 1px solid var(--cr-red);
@@ -395,8 +461,8 @@ body {
     gap: 8px;
     padding: 4px 8px;
   }
-  .builder-field input {
-    width: 130px;
+  .builder-field input[type="date"] {
+    width: 110px;
   }
   .cal-btn--regenerate {
     margin-left: 0;

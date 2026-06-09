@@ -29,6 +29,16 @@
     <header class="site-header">
       <h1 class="site-title">IL CINEMA RITROVATO</h1>
       <p class="site-subtitle">Bologna · 16 June – 2 July 2026 · 40th Edition</p>
+      <div class="header-menu">
+        <button id="menu-trigger" class="menu-trigger" type="button">☰</button>
+        <div id="menu-dropdown" class="menu-dropdown">
+          <div class="menu-dropdown-inner">
+            <button class="menu-item" data-action="import-schedule">Import Schedule</button>
+            <button class="menu-item" data-action="export-schedule">Export Schedule</button>
+          </div>
+        </div>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none">
     </header>
 
     <section id="calendar-section">
@@ -49,11 +59,13 @@
       <div id="builder-toolbar" class="builder-toolbar" style="display:none">
         <label class="builder-field">
           <span>Start</span>
-          <input type="datetime-local" id="builder-start" value="2026-06-21T00:00">
+          <input type="date" id="builder-start-date" value="2026-06-21">
+          <input type="text" id="builder-start-time" value="00:00" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" inputmode="numeric" class="time-input">
         </label>
         <label class="builder-field">
           <span>End</span>
-          <input type="datetime-local" id="builder-end" value="2026-06-29T00:00">
+          <input type="date" id="builder-end-date" value="2026-06-29">
+          <input type="text" id="builder-end-time" value="00:00" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" inputmode="numeric" class="time-input">
         </label>
         <button id="builder-regenerate" class="cal-btn cal-btn--regenerate">Regenerate</button>
       </div>
