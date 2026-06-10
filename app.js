@@ -29,6 +29,12 @@ let builderSeed = Date.now();
 let scheduleStart = '2026-06-21T00:00:00';
 let scheduleEnd = '2026-06-29T00:00:00';
 let shadeEvents = [];
+let showPinnedOnly = false;
+
+try {
+  const saved = localStorage.getItem('show-pinned-only');
+  if (saved === 'true') showPinnedOnly = true;
+} catch (e) { /* ignore */ }
 
 try {
   const saved = localStorage.getItem('pinned-events');
@@ -87,6 +93,12 @@ function saveFilmPriorities() {
 function saveCalendarDayCount() {
   try {
     localStorage.setItem('calendar-day-count', calendarDayCount);
+  } catch (e) { /* ignore */ }
+}
+
+function saveShowPinnedOnly() {
+  try {
+    localStorage.setItem('show-pinned-only', showPinnedOnly);
   } catch (e) { /* ignore */ }
 }
 
@@ -556,7 +568,6 @@ function passesFilters(event) {
 
 function passesFiltersForFilms(event) {
   if (currentFilters.venues.size > 0 && !currentFilters.venues.has(event.venue)) return false;
-  if (currentFilters.type && event.type !== currentFilters.type) return false;
   return event.schedule_datetime !== null;
 }
 
@@ -635,6 +646,13 @@ function isUnsatisfiedPriority(eventSlug) {
     }
   }
   return false;
+}
+
+function updateScheduleModeToggle() {
+  const btn = document.getElementById('schedule-mode-toggle');
+  if (!btn) return;
+  btn.textContent = showPinnedOnly ? 'Pinned only' : 'Pinned + interested';
+  btn.classList.toggle('active', showPinnedOnly);
 }
 
 // ── Calendar ──────────────────────────────────────
@@ -798,7 +816,11 @@ function buildCalendarEvents() {
 
     let filtered = allEvents.filter(passesFilters);
     if (activeCalendarTab === 'personal') {
-      filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+      if (showPinnedOnly) {
+        filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] === 'pin');
+      } else {
+        filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+      }
     } else if (activeCalendarTab === 'builder') {
       filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
     }
@@ -889,7 +911,11 @@ function renderEventsList() {
   if (activeCalendarTab === 'all') {
     filtered = filtered.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    if (showPinnedOnly) {
+      filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] === 'pin');
+    } else {
+      filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    }
   } else if (activeCalendarTab === 'builder') {
     filtered = filtered.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
@@ -1083,7 +1109,11 @@ function renderFilmsList() {
   if (activeCalendarTab === 'all') {
     baseEvents = baseEvents.filter(isEventInCalendarView);
   } else if (activeCalendarTab === 'personal') {
-    baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    if (showPinnedOnly) {
+      baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] === 'pin');
+    } else {
+      baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || isUnsatisfiedPriority(ev.slug));
+    }
   } else if (activeCalendarTab === 'builder') {
     baseEvents = baseEvents.filter(ev => focusedEvents.has(ev.slug) || eventPriorities[ev.slug] || suggestedEvents.has(ev.slug) || isBuilderUnsatisfied(ev.slug));
   }
@@ -1309,8 +1339,10 @@ function setupTabListeners() {
     activeCalendarTab = name;
 
     const builderToolbar = document.getElementById('builder-toolbar');
+    const personalToolbar = document.getElementById('personal-toolbar');
     if (name === 'builder') {
       builderToolbar.style.display = '';
+      personalToolbar.style.display = 'none';
       if (scheduleStart) {
         document.getElementById('builder-start-date').value = scheduleStart.substring(0, 10);
         document.getElementById('builder-start-time').value = scheduleStart.substring(11, 16);
@@ -1322,6 +1354,12 @@ function setupTabListeners() {
     } else {
       builderToolbar.style.display = 'none';
       suggestedEvents = new Set();
+      if (name === 'personal') {
+        personalToolbar.style.display = '';
+        updateScheduleModeToggle();
+      } else {
+        personalToolbar.style.display = 'none';
+      }
     }
 
     expandedEventSlug = null;
@@ -1412,6 +1450,14 @@ function setupTabListeners() {
   });
   document.getElementById('builder-regenerate').addEventListener('click', () => {
     regenerateSchedule();
+  });
+
+  // Schedule mode toggle
+  document.getElementById('schedule-mode-toggle').addEventListener('click', () => {
+    showPinnedOnly = !showPinnedOnly;
+    saveShowPinnedOnly();
+    updateScheduleModeToggle();
+    applyFilters();
   });
 }
 

@@ -56,6 +56,9 @@
         </div>
         <button id="cal-next" class="cal-btn" title="Next day">〉</button>
       </div>
+      <div id="personal-toolbar" class="personal-toolbar" style="display:none">
+        <button id="schedule-mode-toggle" class="cal-btn schedule-mode-toggle">Pinned + interested</button>
+      </div>
       <div id="builder-toolbar" class="builder-toolbar" style="display:none">
         <label class="builder-field">
           <span>Start</span>
@@ -98,14 +101,6 @@
             </div>
           </div>
 
-          <label class="filter-group">
-            <span class="filter-label">Type</span>
-            <select id="filter-type">
-              <option value="">All Types</option>
-              <option value="Screening">Screening</option>
-              <option value="Appointment">Appointment</option>
-            </select>
-          </label>
         </div>
       </section>
 
@@ -115,9 +110,14 @@
           <button class="tab" data-tab="films">Films</button>
         </nav>
         <div id="events-panel" class="tab-panel active">
-          <label class="filter-group filter-group--search filter-group--tab-search">
+          <div class="filter-group--tab-search">
             <input type="text" id="filter-search-events" placeholder="Search events…">
-          </label>
+            <select id="filter-type">
+              <option value="">All Types</option>
+              <option value="Screening">Screening</option>
+              <option value="Appointment">Appointment</option>
+            </select>
+          </div>
           <div id="events-list"></div>
         </div>
         <div id="films-panel" class="tab-panel">

@@ -368,6 +368,28 @@ body {
   color: #3A9A00;
 }
 
+/* ── Personal toolbar ───────────────────────────── */
+.personal-toolbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--cr-gray-light);
+  background: var(--cr-white);
+  flex-shrink: 0;
+}
+.schedule-mode-toggle {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.schedule-mode-toggle.active {
+  color: var(--cr-white);
+  background: var(--cr-red);
+  border-color: var(--cr-red);
+}
+.schedule-mode-toggle.active:hover {
+  background: var(--cr-red-dark);
+  border-color: var(--cr-red-dark);
+}
+
 #calendar {
   flex: 1;
   overflow: hidden;
@@ -463,15 +485,37 @@ body {
 }
 .filter-group--tab-search {
   padding: 10px 0 10px;
-  display: block;
+  display: flex;
+  gap: 8px;
   position: sticky;
   top: 0;
   background: var(--cr-white);
   z-index: 3;
 }
 .filter-group--tab-search input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
+}
+.filter-group--tab-search select {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--cr-black);
+  background: var(--cr-gray-off);
+  border: 1px solid var(--cr-gray-light);
+  padding: 4px 24px 4px 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23707070'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+.filter-group--tab-search select:focus {
+  outline: 1px solid var(--cr-red);
+  outline-offset: -1px;
 }
 
 /* ── Venue multi-select ─────────────────────────── */
